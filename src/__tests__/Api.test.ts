@@ -146,7 +146,6 @@ test('Test Bad Min/Max Transfer Amount', async () => {
             "10", 7, true, false, false);
         payload.initial_amount = "10000";
         payload.minimum_transfer_amount = "-1000";
-       
         const signedTransaction = api.signTokenCreateRequest(payload);
         let result = await coreProcessor.processTransaction(signedTransaction.signedTransaction);
         assert(result.status === 400);
@@ -156,11 +155,9 @@ test('Test Bad Min/Max Transfer Amount', async () => {
         const payload = factory.newCreateTokenTransaction(4, "PROD", "XRP3",
             "10", 7, true, false, false);
         payload.initial_amount = "10000";
-
         payload.maximum_transfer_amount = "-50";
         const signedTransaction = api.signTokenCreateRequest(payload);
         let result = await coreProcessor.processTransaction(signedTransaction.signedTransaction);
-        console.log('RESULT:' + JSON.stringify(result, null, 2))
         assert(result.status === 400);
         assert(result.error_code === CommonErrorCodes.TOKEN_SETUP_MAXIMUM_TRANSFER_AMOUNT_LESS_THAN_OR_EQUAL_ZERO.error_code);
     }

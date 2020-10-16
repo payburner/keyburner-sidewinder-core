@@ -5,5 +5,5 @@
  */
 export interface GlobalAddressService {
 
-    setSequence(account_id: string, sequence: number) : Promise<boolean>;
+    setSequence(address: string, sequence: number) : Promise<boolean>;
 }

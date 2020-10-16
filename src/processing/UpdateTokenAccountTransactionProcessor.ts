@@ -21,7 +21,7 @@ export class UpdateTokenAccountTransactionProcessor extends TransactionProcessor
             console.log('Processing create token: ' + decodedTransaction.id);
             const updateTokenTransaction = decodedTransaction.payload as UpdateTokenAccountTransaction;
             self.getTokenService().getToken(updateTokenTransaction.environment, updateTokenTransaction.token_symbol).then(async(token) => {
-                if (token.token_issuer_address !== decodedTransaction.accountId) {
+                if (token.token_issuer_address !== decodedTransaction.address) {
                     resolve(CommonErrorCodes.TOKEN_ACCOUNT_ONLY_ISSUER_CAN_FREEZE);
                     return;
                 }

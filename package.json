@@ -1,6 +1,6 @@
 {
   "name": "@payburner/keyburner-sidewinder-core",
-  "version": "1.1.15",
+  "version": "1.1.16",
   "description": "Core library for Keyburner Sidewinder",
   "keywords": [
     "NACL",
@@ -42,8 +42,8 @@
     "lint": "tslint -p tsconfig.json"
   },
   "dependencies": {
-    "@payburner/keyburner-core": "^1.1.16",
-    "@payburner/keyburner-sidewinder-model": "^1.1.27"
+    "@payburner/keyburner-core": "^1.1.17",
+    "@payburner/keyburner-sidewinder-model": "^1.1.28"
   },
   "devDependencies": {
     "@types/atob": "^2.1.2",

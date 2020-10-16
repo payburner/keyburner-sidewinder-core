@@ -74,7 +74,7 @@ export class CreateTokenTransactionProcessor extends TransactionProcessorBase im
                 const token = {
                     token_symbol: createTokenTransaction.token_symbol,
                     environment: createTokenTransaction.environment,
-                    token_issuer_address: decodedTransaction.accountId,
+                    token_issuer_address: decodedTransaction.address,
                     initial_amount: parseInt(createTokenTransaction.initial_amount).toFixed(0),
                     transaction_fee: parseInt(createTokenTransaction.transaction_fee).toFixed(0),
                     allow_transfers_between_accounts: createTokenTransaction.allow_transfers_between_accounts,
@@ -93,9 +93,9 @@ export class CreateTokenTransactionProcessor extends TransactionProcessorBase im
 
                     let ownerAccount = {
                         token_account_id: AccountUtils.calculateTokenAccountId(token.environment,
-                            token.token_symbol, decodedTransaction.accountId),
+                            token.token_symbol, decodedTransaction.address),
                         token_symbol: token.token_symbol,
-                        account_owner_address: decodedTransaction.accountId,
+                        account_owner_address: decodedTransaction.address,
                         environment: token.environment,
                         sequence: 0,
                         available_balance: createTokenTransaction.initial_amount,

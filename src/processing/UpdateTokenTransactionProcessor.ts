@@ -64,7 +64,7 @@ export class UpdateTokenTransactionProcessor extends TransactionProcessorBase im
                     }
                 }
 
-                if (token.token_issuer_address !== decodedTransaction.accountId) {
+                if (token.token_issuer_address !== decodedTransaction.address) {
                     resolve(CommonErrorCodes.TOKEN_UPDATE_NOT_AUTHORIZED);
                     return;
                 }

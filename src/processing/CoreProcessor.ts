@@ -33,7 +33,7 @@ export class CoreProcessor {
         const self = this;
         return new Promise((resolve, reject) => {
             const decodedTransaction = self.keyburner.decodeTransaction(signedTransaction);
-            self.globalAccountService.setSequence(decodedTransaction.accountId, decodedTransaction.payload.sequence).then(
+            self.globalAccountService.setSequence(decodedTransaction.address, decodedTransaction.payload.sequence).then(
                 (result) => {
                     if (result) {
                         resolve(decodedTransaction);

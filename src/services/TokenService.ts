@@ -4,7 +4,6 @@ export interface TokenService {
     getToken(environment: string, token_symbol: string) : Promise<TokenDefinition>;
     createToken(token: TokenDefinition): Promise<TokenDefinition>;
     updateToken(token: TokenDefinition) : Promise<TokenDefinition>;
-
     freezeTokenAccount(environment: string, token_symbol: string, address: string) : Promise<TokenAccount>;
     unFreezeTokenAccount(environment: string, token_symbol: string, address: string) : Promise<TokenAccount>;
     getTokenAccount(environment: string, token_symbol: string, address: string): Promise<TokenAccount>;
