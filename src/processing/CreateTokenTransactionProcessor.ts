@@ -30,7 +30,7 @@ export class CreateTokenTransactionProcessor extends TransactionProcessorBase im
 
                 if (typeof createTokenTransaction.maximum_transfer_amount !== 'undefined' &&
                     typeof createTokenTransaction.minimum_transfer_amount !== 'undefined' &&
-                    parseInt(createTokenTransaction.minimum_transfer_amount)> parseInt(createTokenTransaction.maximum_transfer_amount)) {
+                    parseInt(createTokenTransaction.minimum_transfer_amount) > parseInt(createTokenTransaction.maximum_transfer_amount)) {
                     resolve(CommonErrorCodes.TOKEN_SETUP_MINIMUM_TRANSFER_AMOUNTER_GREATER_THAN_MAXIMUM_TRANSFER_AMOUNT);
                     return;
                 }
@@ -104,7 +104,7 @@ export class CreateTokenTransactionProcessor extends TransactionProcessorBase im
                         frozen: false
                     } as TokenAccount;
                     try {
-                        ownerAccount = await this.getTokenService().createTokenAccount(ownerAccount);
+                        await this.getTokenService().createTokenAccount(ownerAccount);
                         resolve({status: 200, data: createResponse})
                     } catch (error) {
                         resolve({status: 500, error: 'Problem creating receiver account.'});

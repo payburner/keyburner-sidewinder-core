@@ -1,6 +1,6 @@
 {
   "name": "@payburner/keyburner-sidewinder-core",
-  "version": "1.1.16",
+  "version": "1.1.17",
   "description": "Core library for Keyburner Sidewinder",
   "keywords": [
     "NACL",
