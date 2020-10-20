@@ -75,13 +75,13 @@ export class CreateTokenTransactionProcessor extends TransactionProcessorBase im
                     token_symbol: createTokenTransaction.token_symbol,
                     environment: createTokenTransaction.environment,
                     token_issuer_address: decodedTransaction.address,
-                    initial_amount: parseInt(createTokenTransaction.initial_amount).toFixed(0),
-                    transaction_fee: parseInt(createTokenTransaction.transaction_fee).toFixed(0),
+                    initial_amount: this.formatInt(createTokenTransaction.initial_amount),
+                    transaction_fee: this.formatInt(createTokenTransaction.transaction_fee),
                     allow_transfers_between_accounts: createTokenTransaction.allow_transfers_between_accounts,
                     is_permissioned: createTokenTransaction.is_permissioned,
-                    maximum_balance: parseInt(createTokenTransaction.maximum_balance).toFixed(0),
-                    minimum_transfer_amount: parseInt(createTokenTransaction.minimum_transfer_amount).toFixed(0),
-                    maximum_transfer_amount: parseInt(createTokenTransaction.maximum_transfer_amount).toFixed(0),
+                    maximum_balance: this.formatInt(createTokenTransaction.maximum_balance),
+                    minimum_transfer_amount: this.formatInt(createTokenTransaction.minimum_transfer_amount ),
+                    maximum_transfer_amount: this.formatInt(createTokenTransaction.maximum_transfer_amount),
                     frozen: createTokenTransaction.frozen,
                     decimal_precision: parseInt(createTokenTransaction.decimal_precision.toFixed(0)),
                     underlying_currency: createTokenTransaction.underlying_currency,
@@ -117,6 +117,10 @@ export class CreateTokenTransactionProcessor extends TransactionProcessorBase im
                 });
             })
         });
+    }
+
+    formatInt( input: string ) : string {
+       return  typeof input !== 'undefined' ? parseInt(input).toFixed(0) : undefined
     }
 
     getTransactionType(): TransactionTypes {

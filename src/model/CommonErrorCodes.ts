@@ -12,6 +12,10 @@ export class CommonErrorCodes {
     static readonly SYSTEM_PROBLEM_SETTING_RECEIVER_BALANCE = {
         status: 500, error_code: 30, error: 'Problem Setting the receiver balance.'
     } as ServiceResponse;
+    // -- token update errors.
+    static readonly SYSTEM_PROBLEM_UNKNOWN = {
+        status: 500, error_code: 40, error: 'Unknown system problem...'
+    } as ServiceResponse;
 
     // -- token update errors.
     static readonly SYSTEM_PROBLEM_UPDATING_TOKEN = {
@@ -65,6 +69,8 @@ export class CommonErrorCodes {
     static readonly SYSTEM_PROBLEM_UPDATING_TOKEN_ACCOUNT = {
         status: 500, error_code: 700, error: 'Problem updating the token account...'
     } as ServiceResponse;
+
+
 
     // --- Low level user protocol errors.
     static readonly UNKNOWN_TRANSACTION_TYPE = {

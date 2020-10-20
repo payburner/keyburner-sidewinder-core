@@ -41,6 +41,14 @@ export class TransferTransactionProcessor extends TransactionProcessorBase imple
                 } catch (error) {
                     // -- noop
                 }
+                let issuerAccount = null;
+                try {
+                    issuerAccount = await this.getTokenService()
+                    .getTokenAccount(transferTransaction.environment, transferTransaction.token_symbol,
+                        token.token_issuer_address);
+                } catch (error) {
+                    // -- noop
+                }
                 let isReceiverPermissioned = false;
                 if (token.is_permissioned && receiverAccount === null) {
                     // -- if the owner is the sender, then we assume that we are updating the permission.
@@ -121,31 +129,76 @@ export class TransferTransactionProcessor extends TransactionProcessorBase imple
                     }
                 }
 
-                try {
-                    // update sender account.
-                    await this.getTokenService().setAmounts(
-                        transferTransaction.environment,
-                        transferTransaction.sender_address,
-                        transferTransaction.token_symbol,
-                        (parseInt(senderAccount.total_balance) - (parseInt(transferTransaction.transfer_amount)) -
-                            parseInt(token.transaction_fee)), (parseInt(senderAccount.available_balance) - (parseInt(transferTransaction.transfer_amount)) -
-                            parseInt(token.transaction_fee)));
-                } catch (error) {
-                    resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_SENDER_BALANCE);
-                    return;
+                if (senderAccount.account_owner_address === token.token_issuer_address) {
+                    try {
+                        // update sender account.
+                        await this.getTokenService().setAmounts(
+                            transferTransaction.environment,
+                            transferTransaction.sender_address,
+                            transferTransaction.token_symbol,
+                            (parseInt(senderAccount.total_balance) - (parseInt(transferTransaction.transfer_amount))), (parseInt(senderAccount.available_balance) - (parseInt(transferTransaction.transfer_amount))));
+                    } catch (error) {
+                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_SENDER_BALANCE);
+                        return;
+                    }
+                }
+                else {
+                    try {
+                        // update sender account.
+                        await this.getTokenService().setAmounts(
+                            transferTransaction.environment,
+                            transferTransaction.sender_address,
+                            transferTransaction.token_symbol,
+                            (parseInt(senderAccount.total_balance) - (parseInt(transferTransaction.transfer_amount)) -
+                                parseInt(token.transaction_fee)), (parseInt(senderAccount.available_balance) - (parseInt(transferTransaction.transfer_amount)) -
+                                parseInt(token.transaction_fee)));
+                    } catch (error) {
+                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_SENDER_BALANCE);
+                        return;
+                    }
                 }
 
-                try {
-                    // update receiver account.
-                    await this.getTokenService().setAmounts(
-                        transferTransaction.environment,
-                        transferTransaction.receiver_address, transferTransaction.token_symbol,
-                        parseInt(receiverAccount.total_balance) + (parseInt(transferTransaction.transfer_amount)),
-                        parseInt(receiverAccount.available_balance) + (parseInt(transferTransaction.transfer_amount)));
-                } catch (error) {
-                    resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_RECEIVER_BALANCE);
-                    return;
+                if (receiverAccount.account_owner_address === token.token_issuer_address) {
+                    try {
+                        // update receiver account.
+                        await this.getTokenService().setAmounts(
+                            transferTransaction.environment,
+                            transferTransaction.receiver_address, transferTransaction.token_symbol,
+                            parseInt(receiverAccount.total_balance) + (parseInt(transferTransaction.transfer_amount)+parseInt(token.transaction_fee)),
+                            parseInt(receiverAccount.available_balance) + (parseInt(transferTransaction.transfer_amount)+parseInt(token.transaction_fee)));
+                    } catch (error) {
+                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_RECEIVER_BALANCE);
+                        return;
+                    }
                 }
+                else {
+                    try {
+                        // update receiver account.
+                        await this.getTokenService().setAmounts(
+                            transferTransaction.environment,
+                            transferTransaction.receiver_address, transferTransaction.token_symbol,
+                            parseInt(receiverAccount.total_balance) + (parseInt(transferTransaction.transfer_amount)),
+                            parseInt(receiverAccount.available_balance) + (parseInt(transferTransaction.transfer_amount)));
+                    } catch (error) {
+                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_RECEIVER_BALANCE);
+                        return;
+                    }
+                }
+
+                if (senderAccount.account_owner_address !== token.token_issuer_address && receiverAccount.account_owner_address !== token.token_issuer_address) {
+                    try {
+                        // update token account.
+                        await this.getTokenService().setAmounts(
+                            transferTransaction.environment,
+                            token.token_issuer_address, transferTransaction.token_symbol,
+                            parseInt(issuerAccount.total_balance) + (parseInt(token.transaction_fee)),
+                            parseInt(issuerAccount.available_balance) + (parseInt(token.transaction_fee)));
+                    } catch (error) {
+                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_RECEIVER_BALANCE);
+                        return;
+                    }
+                }
+
                 resolve({status: 200});
 
             }).catch((error) => {

@@ -1,7 +1,5 @@
 import {DecodedTransaction, KeyBurner} from "@payburner/keyburner-core/dist/npm";
-import {
-    TransactionTypes
-} from "@payburner/keyburner-sidewinder-model/dist/npm";
+import {TransactionTypes} from "@payburner/keyburner-sidewinder-model/dist/npm";
 import {Transaction} from "@payburner/keyburner-sidewinder-model/dist/npm/transactions/Transaction";
 import {TokenService} from "../services/TokenService";
 import {ServiceResponse} from "../model/ServiceResponse";
@@ -14,7 +12,7 @@ import {TransferTransactionProcessor} from "./TransferTransactionProcessor";
 import {CommonErrorCodes} from "../model/CommonErrorCodes";
 
 export class CoreProcessor {
-    constructor(globalAccountService: GlobalAddressService, tokenService: TokenService ) {
+    constructor(globalAccountService: GlobalAddressService, tokenService: TokenService) {
         this.keyburner = new KeyBurner();
         this.globalAccountService = globalAccountService;
         this.transactionProcessors.push(
@@ -25,7 +23,7 @@ export class CoreProcessor {
         );
     }
 
-    transactionProcessors : Array<TransactionProcessor> = [];
+    transactionProcessors: Array<TransactionProcessor> = [];
     keyburner: KeyBurner = null;
     globalAccountService: GlobalAddressService = null;
 
@@ -37,8 +35,7 @@ export class CoreProcessor {
                 (result) => {
                     if (result) {
                         resolve(decodedTransaction);
-                    }
-                    else {
+                    } else {
                         reject('Invalid sequence.');
                     }
                 }
@@ -52,33 +49,47 @@ export class CoreProcessor {
         return (decodedTransaction.payload as Transaction).transaction_type;
     }
 
-    processTransaction(signedTransaction: string) : Promise<ServiceResponse> {
+    decodeAndProcessTransaction(signedTransaction: string): Promise<ServiceResponse> {
         const self = this;
         return new Promise((resolve, reject) => {
-            this.decodeTransaction(signedTransaction).then((decodedTransaction) => {
-                if (decodedTransaction.verified) {
-                    const transactionType = this.getTransactionType(decodedTransaction);
-                    let found = false;
-                    self.transactionProcessors.forEach((transactionProcessor) => {
-                        if (transactionProcessor.getTransactionType() === transactionType) {
-                            found = true;
-                            transactionProcessor.doProcess(decodedTransaction)
-                            .then((result) => {
-                                resolve(result);
-                            }).catch((error) => {
-                                resolve(error);
-                            });
-                        }
-                    });
-                    if (!found) {
-                        resolve(CommonErrorCodes.UNKNOWN_TRANSACTION_TYPE);
-                    }
-                } else {
-                    resolve(CommonErrorCodes.TRANSACTION_INVALID);
-                }
+            self.decodeTransaction(signedTransaction).then((decodedTransaction) => {
+                self.processTransaction(decodedTransaction).then((response) => {
+                    resolve(response);
+                }).catch((error) => {
+                    resolve(CommonErrorCodes.SYSTEM_PROBLEM_UNKNOWN);
+                });
             }).catch((error) => {
                 resolve(CommonErrorCodes.INVALID_SEQUENCE);
             });
+
+        })
+    }
+
+    processTransaction(decodedTransaction: DecodedTransaction): Promise<ServiceResponse> {
+        const self = this;
+        return new Promise((resolve, reject) => {
+
+            if (decodedTransaction.verified) {
+                const transactionType = this.getTransactionType(decodedTransaction);
+                let found = false;
+                self.transactionProcessors.forEach((transactionProcessor) => {
+                    if (transactionProcessor.getTransactionType() === transactionType) {
+                        found = true;
+                        transactionProcessor.doProcess(decodedTransaction)
+                        .then((result) => {
+                            resolve(result);
+                        }).catch((error) => {
+                            resolve(error);
+                        });
+                    }
+                });
+                if (!found) {
+                    resolve(CommonErrorCodes.UNKNOWN_TRANSACTION_TYPE);
+                }
+            } else {
+                resolve(CommonErrorCodes.TRANSACTION_INVALID);
+            }
+
         });
     }
 }
