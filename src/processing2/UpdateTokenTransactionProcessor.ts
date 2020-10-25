@@ -1,7 +1,7 @@
 import {TransactionProcessor} from "./TransactionProcessor";
 import {DecodedTransaction} from "@payburner/keyburner-core/dist/npm";
 import {GlobalAddressService, ServiceResponse, TokenService} from "..";
-import {TransactionTypes, UpdateTokenTransaction} from "@payburner/keyburner-sidewinder-model/dist/npm";
+import {AccountUtils, TransactionTypes, UpdateTokenTransaction} from "@payburner/keyburner-sidewinder-model/dist/npm";
 import {TransactionProcessorBase} from "./TransactionProcessorBase";
 import {CommonErrorCodes} from "../model/CommonErrorCodes";
 
@@ -11,7 +11,7 @@ export class UpdateTokenTransactionProcessor extends TransactionProcessorBase im
         super(globalAccountService, tokenService);
     }
 
-    doProcess(decodedTransaction: DecodedTransaction): Promise<ServiceResponse> {
+    doProcess(decodedTransaction: DecodedTransaction, items: Array<any>): Promise<ServiceResponse> {
         const self = this;
 
         return new Promise((resolve, reject) => {
@@ -69,18 +69,24 @@ export class UpdateTokenTransactionProcessor extends TransactionProcessorBase im
                     return;
                 }
 
-                token.frozen = updateTokenTransaction.frozen;
-                token.transaction_fee = updateTokenTransaction.transaction_fee;
-                token.maximum_balance = updateTokenTransaction.maximum_balance;
-                token.minimum_transfer_amount = updateTokenTransaction.minimum_transfer_amount;
-                token.maximum_transfer_amount = updateTokenTransaction.maximum_transfer_amount;
-                self.getTokenService().updateToken(token).then((updated) => {
-                    resolve({status: 200, data: updated})
-                }).catch((error) => {
-                    resolve(CommonErrorCodes.SYSTEM_PROBLEM_UPDATING_TOKEN);
+                items.push({
+                    Update: {
+                        TableName: 'sidewinder_token',
+                        Key: {
+                            token_uri: AccountUtils.calculateTokenId(updateTokenTransaction.environment,
+                                updateTokenTransaction.token_symbol),
+                        },
+                        UpdateExpression: 'SET frozen = :frozen, transaction_fee = :transaction_fee, maximum_balance = :maximum_balance, minimum_transfer_amount=:minimum_transfer_amount, maximum_transfer_amount=:maximum_transfer_amount',
+                        'ExpressionAttributeValues': {
+                            ':frozen': updateTokenTransaction.frozen,
+                            ':transaction_fee': updateTokenTransaction.transaction_fee,
+                            ':maximum_balance': updateTokenTransaction,
+                            ':minimum_transfer_amount' : updateTokenTransaction.minimum_transfer_amount,
+                            ':maximum_transfer_amount' : updateTokenTransaction.maximum_transfer_amount
+                        }
+                    }
                 });
-
-
+                resolve({status: 200})
             }).catch((error) => {
                 resolve(CommonErrorCodes.TOKEN_NOT_FOUND);
             })

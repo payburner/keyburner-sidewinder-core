@@ -1,7 +1,7 @@
 
-import {GlobalAddressService} from "../services/GlobalAddressService";
+import {GlobalAddressService} from "../../GlobalAddressService";
 
-export class TestGlobalAddressService implements GlobalAddressService {
+export class MemoryGlobalAddressService implements GlobalAddressService {
 
     addresses = {};
 

@@ -1,8 +1,8 @@
 import {TransactionFactory, TransactionTypes, TokenDefinition} from "@payburner/keyburner-sidewinder-model/dist/npm";
  
 import {CoreProcessor} from "../processing/CoreProcessor";
-import {TestGlobalAddressService} from "./TestGlobalAddressService";
-import {TestTokenService} from "./TestTokenService";
+import {MemoryGlobalAddressService} from "../services/impl/memory/MemoryGlobalAddressService";
+import {MemoryTokenService} from "../services/impl/memory/MemoryTokenService";
 import {CommonErrorCodes} from "../model/CommonErrorCodes";
 import assert = require("assert");
 import {Api, ServiceResponse, TokenService} from "..";
@@ -11,8 +11,8 @@ test('Test Signing and Decoding', async () => {
     const api = new Api();
     api.newAddress();
     const factory = new TransactionFactory();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), new TestTokenService());
-    const payload = factory.newCreateTokenTransaction(0, "XRP", "prod", "10", 7, true, false, false);
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), new MemoryTokenService());
+    const payload = factory.newCreateTokenTransaction(0, "XRP", "prod", 10, 7, true, false, false);
     const signedTransaction = api.signTokenCreateRequest(payload);
     const decodedTransaction = await coreProcessor.decodeTransaction(signedTransaction.signedTransaction);
     assert(coreProcessor.getTransactionType(decodedTransaction) === TransactionTypes.CreateToken);
@@ -23,16 +23,16 @@ test('Test Token Creation with Initial Amount', async () => {
     console.log('=============  TEST: Test Token Creation with Initial Amount. ==============');
 
     const api = new Api();
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     api.newAddress();
     const factory = new TransactionFactory();
 
     // -- this should succeed.
     const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP",
-        "10", 7, true, false, false);
+        10, 7, true, false, false);
 
-    payload.initial_amount = "10000";
+    payload.initial_amount = 10000;
     assert(payload.environment === "PROD");
 
     const signedTransaction = api.signTokenCreateRequest(payload);
@@ -47,14 +47,14 @@ test('Test Token Creation with Initial Amount', async () => {
 
     // -- this should fail because the token already exists.
     const payload2 = factory.newCreateTokenTransaction(1, "PROD", "XRP",
-        "10", 7, true, false, false);
+        10, 7, true, false, false);
     const signedTransaction2 = api.signTokenCreateRequest(payload2);
     let result2 = await coreProcessor.decodeAndProcessTransaction(signedTransaction2.signedTransaction);
     assert(result2.status === 400);
 
     const account = await tokenService.getTokenAccount("PROD", "XRP", api.address);
-    assert(account.total_balance === "10000");
-    assert(account.available_balance === "10000");
+    assert(account.total_balance === 10000);
+    assert(account.available_balance === 10000);
 
 
 });
@@ -62,15 +62,15 @@ test('Test Token Creation with Initial Amount', async () => {
 test('Test Invalid Decimal Precision', async () => {
     console.log('=============  TEST: Test Invalid Decimal Precision. ==============');
     const api = new Api();
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     api.newAddress();
     const factory = new TransactionFactory();
 
     // -- this should succeed.
     const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP",
-        "10", -7, true, false, false);
-    payload.initial_amount = "10000";
+        10, -7, true, false, false);
+    payload.initial_amount = 10000;
     const signedTransaction = api.signTokenCreateRequest(payload);
     let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
     assert(result.status === 400);
@@ -81,15 +81,15 @@ test('Test Invalid Decimal Precision', async () => {
 test('Test Invalid Transaction Fee', async () => {
     console.log('=============  TEST: Test Invalid Transaction Free. ==============');
     const api = new Api();
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     api.newAddress();
     const factory = new TransactionFactory();
 
     {
         const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP",
-            "-10", 7, true, false, false);
-        payload.initial_amount = "10000";
+            -10, 7, true, false, false);
+        payload.initial_amount = 10000;
         const signedTransaction = api.signTokenCreateRequest(payload);
         let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         assert(result.status === 400);
@@ -97,28 +97,54 @@ test('Test Invalid Transaction Fee', async () => {
     }
     {
         const payload = factory.newCreateTokenTransaction(1, "PROD", "XRP",
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
         const signedTransaction = api.signTokenCreateRequest(payload);
         let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         assert(result.status === 200);
     }
 });
 
-test('Test Bad Min/Max Transfer Amount', async () => {
-    console.log('=============  TEST: Test Bad Min/Max Transfer Amount. ==============');
+test('Test Malformed Initial amount', async () => {
+    console.log('=============  TEST: Test Malformed Initial Amount ==============');
     const api = new Api();
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     api.newAddress();
     const factory = new TransactionFactory();
 
     {
         const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP",
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
-        payload.minimum_transfer_amount = "1000";
-        payload.maximum_transfer_amount = "50";
+            -10, 7, true, false, false);
+
+
+        let testPayload :any = null;
+        testPayload = payload;
+        testPayload.initial_amount = "doggy";
+        const signedTransaction = api.signTokenCreateRequest(testPayload);
+
+        let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
+        console.log('MALFORMED RESPONSE:' + JSON.stringify(result, null, 2));
+        assert(result.status === 400);
+        assert(result.error_code === CommonErrorCodes.TOKEN_SETUP_MALFORMED_INITIAL_AMOUNT.error_code);
+    }
+
+});
+
+test('Test Bad Min/Max Transfer Amount', async () => {
+    console.log('=============  TEST: Test Bad Min/Max Transfer Amount. ==============');
+    const api = new Api();
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
+    api.newAddress();
+    const factory = new TransactionFactory();
+
+    {
+        const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP",
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
+        payload.minimum_transfer_amount = 1000;
+        payload.maximum_transfer_amount = 50;
         const signedTransaction = api.signTokenCreateRequest(payload);
         let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         assert(result.status === 400);
@@ -127,10 +153,10 @@ test('Test Bad Min/Max Transfer Amount', async () => {
 
     {
         const payload = factory.newCreateTokenTransaction(1, "PROD", "XRP1",
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
-        payload.minimum_transfer_amount = "1000";
-        payload.maximum_transfer_amount = "1000";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
+        payload.minimum_transfer_amount = 1000;
+        payload.maximum_transfer_amount = 1000;
         const signedTransaction = api.signTokenCreateRequest(payload);
         let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         assert(result.status === 200);
@@ -139,10 +165,10 @@ test('Test Bad Min/Max Transfer Amount', async () => {
 
     {
         const payload = factory.newCreateTokenTransaction(2, "PROD", "XRP2",
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
-        payload.minimum_transfer_amount = "999";
-        payload.maximum_transfer_amount = "1000";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
+        payload.minimum_transfer_amount = 999;
+        payload.maximum_transfer_amount = 1000;
         const signedTransaction = api.signTokenCreateRequest(payload);
         let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         assert(result.status === 200);
@@ -151,9 +177,9 @@ test('Test Bad Min/Max Transfer Amount', async () => {
 
     {
         const payload = factory.newCreateTokenTransaction(3, "PROD", "XRP3",
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
-        payload.minimum_transfer_amount = "-1000";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
+        payload.minimum_transfer_amount = -1000;
         const signedTransaction = api.signTokenCreateRequest(payload);
         let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         assert(result.status === 400);
@@ -161,9 +187,9 @@ test('Test Bad Min/Max Transfer Amount', async () => {
     }
     {
         const payload = factory.newCreateTokenTransaction(4, "PROD", "XRP3",
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
-        payload.maximum_transfer_amount = "-50";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
+        payload.maximum_transfer_amount = -50;
         const signedTransaction = api.signTokenCreateRequest(payload);
         let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         assert(result.status === 400);
@@ -175,14 +201,14 @@ test('Test Bad Min/Max Transfer Amount', async () => {
 test('Test No Way to Get Funds In', async () => {
     console.log('=============  TEST: Test No Way to Get Funds In. ==============');
     const api = new Api();
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     api.newAddress();
     const factory = new TransactionFactory();
 
     // -- this should succeed.
     const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP",
-        "10", -7, true, false, false);
+        10, -7, true, false, false);
     const signedTransaction = api.signTokenCreateRequest(payload);
     let result = await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
     assert(result.status === 400);
@@ -192,8 +218,8 @@ test('Test No Way to Get Funds In', async () => {
 
 test('Test Token is Frozen', async () => {
     console.log('=============  TEST: Test Token is Frozen. ==============');
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     const factory = new TransactionFactory();
 
     const tokenOwnerApi = new Api();
@@ -207,8 +233,8 @@ test('Test Token is Frozen', async () => {
 
     // -- this should succeed.
     const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP",
-        "10", 7, true, false, true);
-    payload.initial_amount = "10000";
+        10, 7, true, false, true);
+    payload.initial_amount = 10000;
     assert(payload.environment === "PROD");
 
     const signedTransaction = tokenOwnerApi.signTokenCreateRequest(payload);
@@ -231,7 +257,7 @@ test('Test Token is Frozen', async () => {
     }
     console.log('=============  SEGMENT: Transaction succeeds on un-frozen token ==============');
     {
-        const unfreeze = factory.newUpdateTokenTransaction(2, environment, token_symbol, "10", undefined, undefined, undefined, false );
+        const unfreeze = factory.newUpdateTokenTransaction(2, environment, token_symbol, 10, undefined, undefined, undefined, false );
         const signedUnfreezeTransaction = tokenOwnerApi.signTokenUpdateRequest(unfreeze);
         let unfreezeResult = await coreProcessor.decodeAndProcessTransaction(signedUnfreezeTransaction.signedTransaction);
         assert(unfreezeResult.status === 200);
@@ -242,7 +268,7 @@ test('Test Token is Frozen', async () => {
     }
     console.log('=============  SEGMENT: Freeze again ==============');
 
-    const freeze = factory.newUpdateTokenTransaction( 4, environment, token_symbol, "10", undefined, undefined, undefined,true );
+    const freeze = factory.newUpdateTokenTransaction( 4, environment, token_symbol, 10, undefined, undefined, undefined,true );
     const signedFreezeTransaction = tokenOwnerApi.signTokenUpdateRequest(freeze);
     let freezeResult = await coreProcessor.decodeAndProcessTransaction(signedFreezeTransaction.signedTransaction);
 
@@ -262,7 +288,7 @@ test('Test Token is Frozen', async () => {
     console.log('=============  SEGMENT: Only issuer can freeze or unfreeze ==============');
 
     // -- now let's make sure that only the issuer can freeze or unfreeze.
-    const badboyFreeze = factory.newUpdateTokenTransaction(0, environment, token_symbol, "10", undefined, undefined, undefined,true );
+    const badboyFreeze = factory.newUpdateTokenTransaction(0, environment, token_symbol, 10, undefined, undefined, undefined,true );
     const signedBadboyFreezeTransaction = tokenReceiverApi.signTokenUpdateRequest(badboyFreeze);
     let badboyFreezeResult = await coreProcessor.decodeAndProcessTransaction(signedBadboyFreezeTransaction.signedTransaction);
     assert(badboyFreezeResult.status === 403);
@@ -272,7 +298,7 @@ test('Test Token is Frozen', async () => {
     // -- now let's try freezing the third party a account.
     // -- first unfreeze the token.
     {
-        const unfreeze = factory.newUpdateTokenTransaction(6, environment, token_symbol, "10", undefined, undefined, undefined,false);
+        const unfreeze = factory.newUpdateTokenTransaction(6, environment, token_symbol, 10, undefined, undefined, undefined,false);
         const signedUnfreezeTransaction = tokenOwnerApi.signTokenUpdateRequest(unfreeze);
         let unfreezeResult = await coreProcessor.decodeAndProcessTransaction(signedUnfreezeTransaction.signedTransaction);
         assert(unfreezeResult.status === 200);
@@ -283,7 +309,7 @@ test('Test Token is Frozen', async () => {
 
     {
         const freeze = factory.newUpdateTokenAccountFreezeStatusTransaction(8, environment, token_symbol, tokenReceiverApi.address, true);
-        const freezeTransaction = tokenOwnerApi.signTokenUpdateRequest(freeze);
+        const freezeTransaction = tokenOwnerApi.signTokenUpdateTokenAccountRequest(freeze);
         let freezeResult = await coreProcessor.decodeAndProcessTransaction(freezeTransaction.signedTransaction);
         assert( freezeResult.status === 200);
         assert(freezeResult.data.frozen);
@@ -299,7 +325,7 @@ test('Test Token is Frozen', async () => {
 
     {
         const freeze = factory.newUpdateTokenAccountFreezeStatusTransaction(10, environment, token_symbol, tokenReceiverApi.address, false);
-        const freezeTransaction = tokenOwnerApi.signTokenUpdateRequest(freeze);
+        const freezeTransaction = tokenOwnerApi.signTokenUpdateTokenAccountRequest(freeze);
         let freezeResult = await coreProcessor.decodeAndProcessTransaction(freezeTransaction.signedTransaction);
         assert( freezeResult.status === 200);
         assert(!freezeResult.data.frozen);
@@ -310,8 +336,8 @@ test('Test Token is Frozen', async () => {
 
 test('Test Token is permissioned', async () => {
     console.log('=============  TEST: Test Token is permissioned. ==============');
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     const factory = new TransactionFactory();
 
     const tokenOwnerApi = new Api();
@@ -324,8 +350,8 @@ test('Test Token is permissioned', async () => {
     thirdPartyAPi.newAddress();
 
     // -- this should succeed.
-    const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP", "10", 7, true, true, false);
-    payload.initial_amount = "10000";
+    const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP", 10, 7, true, true, false);
+    payload.initial_amount = 10000;
     assert(payload.environment === "PROD");
 
     const signedTransaction = tokenOwnerApi.signTokenCreateRequest(payload);
@@ -355,8 +381,8 @@ test('Test Token is permissioned', async () => {
 
 test('Test transfers and insufficient balance', async () => {
     console.log('=============  TEST: Test transfers and insufficient balance. ==============');
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     const factory = new TransactionFactory();
 
     const tokenOwnerApi = new Api();
@@ -374,8 +400,8 @@ test('Test transfers and insufficient balance', async () => {
     {
         // -- this should succeed.
         const payload = factory.newCreateTokenTransaction(0, environment, token_symbol,
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
         const signedTransaction = tokenOwnerApi.signTokenCreateRequest(payload);
         await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
     }
@@ -400,8 +426,8 @@ test('Test transfers and insufficient balance', async () => {
 
 test('Test allow transfers between accounts', async () => {
     console.log('=============  TEST: Test allow transfers between accounts. ==============');
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     const factory = new TransactionFactory();
 
     const tokenOwnerApi = new Api();
@@ -419,8 +445,8 @@ test('Test allow transfers between accounts', async () => {
     {
         // -- this should succeed.
         const payload = factory.newCreateTokenTransaction(0, environment, token_symbol,
-            "10", 7, false, false, false);
-        payload.initial_amount = "10000";
+            10, 7, false, false, false);
+        payload.initial_amount = 10000;
         const signedTransaction = tokenOwnerApi.signTokenCreateRequest(payload);
         await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
     }
@@ -442,8 +468,8 @@ test('Test allow transfers between accounts', async () => {
 
 test('Test sender account does not exist', async () => {
     console.log('=============  TEST: Test sender account does not exist. ==============');
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     const factory = new TransactionFactory();
 
     const tokenOwnerApi = new Api();
@@ -458,13 +484,13 @@ test('Test sender account does not exist', async () => {
     {
         // -- this should succeed.
         const payload = factory.newCreateTokenTransaction(0, environment, token_symbol,
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
-        payload.maximum_balance = "200";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
+        payload.maximum_balance = 200;
         const signedTransaction = tokenOwnerApi.signTokenCreateRequest(payload);
         await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         const token = await tokenService.getToken(environment, token_symbol);
-        assert(token.maximum_balance === "200");
+        assert(token.maximum_balance === 200);
     }
 
     console.log('============= SEGMENT: Expect failure sender account does not exist. ==============');
@@ -481,8 +507,8 @@ test('Test sender account does not exist', async () => {
 
 test('Test transfers and maximum balance', async () => {
     console.log('=============  TEST: Test transfers and maximum balance ==============');
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     const factory = new TransactionFactory();
 
     const tokenOwnerApi = new Api();
@@ -497,13 +523,13 @@ test('Test transfers and maximum balance', async () => {
     {
         // -- this should succeed.
         const payload = factory.newCreateTokenTransaction(0, environment, token_symbol,
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
-        payload.maximum_balance = "200";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
+        payload.maximum_balance = 200;
         const signedTransaction = tokenOwnerApi.signTokenCreateRequest(payload);
         await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         const token = await tokenService.getToken(environment, token_symbol);
-        assert(token.maximum_balance === "200");
+        assert(token.maximum_balance === 200);
     }
 
     console.log('============= SEGMENT: Expect failure for max balance when no receiver account exists. ==============');
@@ -536,8 +562,8 @@ test('Test transfers and maximum balance', async () => {
 
 test('Test minimum transfer amount', async () => {
     console.log('=============  TEST: Test transfers and maximum balance ==============');
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     const factory = new TransactionFactory();
 
     const tokenOwnerApi = new Api();
@@ -552,13 +578,13 @@ test('Test minimum transfer amount', async () => {
     {
         // -- this should succeed.
         const payload = factory.newCreateTokenTransaction(0, environment, token_symbol,
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
-        payload.minimum_transfer_amount = "50";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
+        payload.minimum_transfer_amount = 50;
         const signedTransaction = tokenOwnerApi.signTokenCreateRequest(payload);
         await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         const token = await tokenService.getToken(environment, token_symbol);
-        assert(token.minimum_transfer_amount === "50");
+        assert(token.minimum_transfer_amount === 50);
     }
 
     console.log('============= SEGMENT: Expect failure for max balance when no receiver account exists. ==============');
@@ -582,8 +608,8 @@ test('Test minimum transfer amount', async () => {
 test('Test Token Account Not found on update', async () => {
     console.log('=============  TEST: Test Token Account Not found on update ==============');
 
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     const factory = new TransactionFactory();
 
     const tokenOwnerApi = new Api();
@@ -594,8 +620,8 @@ test('Test Token Account Not found on update', async () => {
 
     // -- this should succeed.
     const payload = factory.newCreateTokenTransaction(0, "PROD", "XRP",
-        "10", 7, true, false, false);
-    payload.initial_amount = "10000";
+        10, 7, true, false, false);
+    payload.initial_amount = 10000;
     assert(payload.environment === "PROD");
 
     const signedTransaction = tokenOwnerApi.signTokenCreateRequest(payload);
@@ -607,7 +633,7 @@ test('Test Token Account Not found on update', async () => {
 
     {
         const freeze = factory.newUpdateTokenAccountFreezeStatusTransaction(1, environment, token_symbol, tokenReceiverApi.address, false);
-        const freezeTransaction = tokenOwnerApi.signTokenUpdateRequest(freeze);
+        const freezeTransaction = tokenOwnerApi.signTokenUpdateTokenAccountRequest(freeze);
         let freezeResult = await coreProcessor.decodeAndProcessTransaction(freezeTransaction.signedTransaction);
         console.log('FREEZE RESULT:' + JSON.stringify(freezeResult, null, 2));
         assert( freezeResult.status === 404);
@@ -618,8 +644,8 @@ test('Test Token Account Not found on update', async () => {
 
 test('Test maximum transfer amount', async () => {
     console.log('=============  TEST: Test transfers and maximum balance ==============');
-    const tokenService = new TestTokenService();
-    const coreProcessor = new CoreProcessor(new TestGlobalAddressService(), tokenService);
+    const tokenService = new MemoryTokenService();
+    const coreProcessor = new CoreProcessor(new MemoryGlobalAddressService(), tokenService);
     const factory = new TransactionFactory();
 
     const tokenOwnerApi = new Api();
@@ -634,13 +660,13 @@ test('Test maximum transfer amount', async () => {
     {
         // -- this should succeed.
         const payload = factory.newCreateTokenTransaction(0, environment, token_symbol,
-            "10", 7, true, false, false);
-        payload.initial_amount = "10000";
-        payload.maximum_transfer_amount = "50";
+            10, 7, true, false, false);
+        payload.initial_amount = 10000;
+        payload.maximum_transfer_amount = 50;
         const signedTransaction = tokenOwnerApi.signTokenCreateRequest(payload);
         await coreProcessor.decodeAndProcessTransaction(signedTransaction.signedTransaction);
         const token = await tokenService.getToken(environment, token_symbol);
-        assert(token.maximum_transfer_amount === "50");
+        assert(token.maximum_transfer_amount === 50);
     }
 
     console.log('============= SEGMENT: Expect failure for max balance when no receiver account exists. ==============');
@@ -661,7 +687,7 @@ test('Test maximum transfer amount', async () => {
 const doTransfer = async function( senderApi: Api, receiverApi: Api, environment: string, token_symbol: string, amount: number, coreProcessor: CoreProcessor, tokenService: TokenService, sequence: number) {
     const factory = new TransactionFactory();
     let receiversAccountPre = null;
-    let preReceiverBalance = "0";
+    let preReceiverBalance = 0;
     try {
         receiversAccountPre = await tokenService.getTokenAccount(environment, token_symbol, receiverApi.getAddress());
         preReceiverBalance = receiversAccountPre.available_balance;
@@ -670,20 +696,20 @@ const doTransfer = async function( senderApi: Api, receiverApi: Api, environment
         // ignore.
     }
     let sendersAccountPre = null
-    let sendersBalancePre = "0"
+    let sendersBalancePre = 0
     try {
          sendersAccountPre = await tokenService.getTokenAccount( environment, token_symbol, senderApi.getAddress());
          sendersBalancePre = sendersAccountPre.available_balance;
          console.log('SENDER PRE:' + JSON.stringify(sendersAccountPre, null, 2));
     }
     catch(error) {
-
+        //console.log('Sender Pre Error:' + error);
     }
 
     const token = await tokenService.getToken(environment, token_symbol);
 
 
-    const transferTransaction = factory.newTransferTransaction(sequence, environment, token_symbol, senderApi.getAddress(), receiverApi.getAddress(), amount.toFixed(0));
+    const transferTransaction = factory.newTransferTransaction(sequence, environment, token_symbol, senderApi.getAddress(), receiverApi.getAddress(), amount );
     const signedTransfer = senderApi.signTransferRequest(transferTransaction);
     let transferResult = await coreProcessor.decodeAndProcessTransaction(signedTransfer.signedTransaction);
     console.log('TRANSFER RESULT:' + JSON.stringify(transferResult, null, 2));
@@ -694,27 +720,35 @@ const doTransfer = async function( senderApi: Api, receiverApi: Api, environment
     assert(receiversAccount.account_owner_address === receiverApi.getAddress());
     if (token.token_issuer_address === receiversAccount.account_owner_address) {
         if (receiversAccountPre !== null) {
-            console.log('PRE RECEIVER: pre:' + preReceiverBalance + ', current:' + receiversAccount.available_balance + ', amount:' + amount);
-            assert(parseInt(receiversAccount.available_balance) === parseInt(preReceiverBalance) + amount + 10);
+            console.log('PRE RECEIVER: pre1:' + preReceiverBalance + ', current:' + receiversAccount.available_balance + ', amount:' + amount);
+            assert((receiversAccount.available_balance) === (preReceiverBalance) + amount + 10);
         } else {
-            assert(parseInt(receiversAccount.available_balance) === amount + 10);
+            console.log('PRE RECEIVER: pre2:' + preReceiverBalance + ', current:' + receiversAccount.available_balance + ', amount:' + amount);
+
+            assert((receiversAccount.available_balance) === amount + 10);
         }
     }
     else {
         if (receiversAccountPre !== null) {
-            assert(parseInt(receiversAccount.available_balance) === parseInt(preReceiverBalance) + amount);
+            console.log('PRE RECEIVER: pre3:' + preReceiverBalance + ', current:' + receiversAccount.available_balance + ', amount:' + amount);
+
+            assert((receiversAccount.available_balance) === (preReceiverBalance) + amount);
         } else {
-            assert(parseInt(receiversAccount.available_balance) === amount);
+            console.log('=> PRE RECEIVER: pre4:' + preReceiverBalance + ', current:' + receiversAccount.available_balance + ', amount:' + amount + ', eq=' + ((receiversAccount.available_balance) === amount) + ', t=' + (typeof receiversAccount.available_balance) + ' ' + (typeof amount));
+
+            assert((receiversAccount.available_balance) === amount);
+            console.log('<= PRE RECEIVER: pre4:' + preReceiverBalance + ', current:' + receiversAccount.available_balance + ', amount:' + amount);
+
         }
     }
 
     let sendersAccount = await tokenService.getTokenAccount( environment, token_symbol, senderApi.getAddress());
     console.log('SENDER POST:' + JSON.stringify(sendersAccount, null, 2));
     if (token.token_issuer_address === sendersAccount.account_owner_address) {
-        assert(parseInt(sendersAccount.available_balance) === (parseInt(sendersBalancePre) - amount));
+        assert((sendersAccount.available_balance) === ((sendersBalancePre) - amount));
     }
     else {
-        assert(parseInt(sendersAccount.available_balance) === (parseInt(sendersBalancePre) - amount) - 10);
+        assert((sendersAccount.available_balance) === ((sendersBalancePre) - amount) - 10);
     }
 
 

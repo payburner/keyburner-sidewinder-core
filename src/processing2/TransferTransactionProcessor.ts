@@ -16,7 +16,7 @@ export class TransferTransactionProcessor extends TransactionProcessorBase imple
         super(globalAccountService, tokenService);
     }
 
-    doProcess(decodedTransaction: DecodedTransaction): Promise<ServiceResponse> {
+    doProcess(decodedTransaction: DecodedTransaction, items: Array<any>): Promise<ServiceResponse> {
         const self = this;
 
         return new Promise((resolve, reject) => {
@@ -29,8 +29,10 @@ export class TransferTransactionProcessor extends TransactionProcessorBase imple
                     senderAccount = await this.getTokenService()
                     .getTokenAccount(transferTransaction.environment, transferTransaction.token_symbol,
                         transferTransaction.sender_address);
+                    console.log('Got Sender Account');
                 } catch (error) {
                     // -- noop
+                    console.log('Did not get Sender Account');
                 }
 
                 let receiverAccount = null;
@@ -38,17 +40,12 @@ export class TransferTransactionProcessor extends TransactionProcessorBase imple
                     receiverAccount = await this.getTokenService()
                     .getTokenAccount(transferTransaction.environment, transferTransaction.token_symbol,
                         transferTransaction.receiver_address);
+                    console.log('Got Receiver Account');
                 } catch (error) {
                     // -- noop
+                    console.log('Did not get Receiver Account');
                 }
-                let issuerAccount = null;
-                try {
-                    issuerAccount = await this.getTokenService()
-                    .getTokenAccount(transferTransaction.environment, transferTransaction.token_symbol,
-                        token.token_issuer_address);
-                } catch (error) {
-                    // -- noop
-                }
+
                 let isReceiverPermissioned = false;
                 if (token.is_permissioned && receiverAccount === null) {
                     // -- if the owner is the sender, then we assume that we are updating the permission.
@@ -108,95 +105,112 @@ export class TransferTransactionProcessor extends TransactionProcessorBase imple
                     return;
                 }
 
-                if (receiverAccount === null) {
-                    receiverAccount = {
-                        token_account_id: AccountUtils.calculateTokenAccountId(transferTransaction.environment,
-                            transferTransaction.token_symbol, transferTransaction.receiver_address),
-                        token_symbol: token.token_symbol,
-                        account_owner_address: transferTransaction.receiver_address,
-                        environment: token.environment,
-                        sequence: 0,
-                        available_balance: 0,
-                        total_balance: 0,
-                        locked_balance: 0,
-                        frozen: false
-                    } as TokenAccount;
-                    try {
-                        receiverAccount = await this.getTokenService().createTokenAccount(receiverAccount);
-                    } catch (error) {
-                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_CREATING_RECEIVER_ACCOUNT);
-                        return;
-                    }
-                }
-
                 if (senderAccount.account_owner_address === token.token_issuer_address) {
-                    try {
-                        // update sender account.
-                        await this.getTokenService().setAmounts(
-                            transferTransaction.environment,
-                            transferTransaction.sender_address,
-                            transferTransaction.token_symbol,
-                            ((senderAccount.total_balance) - ((transferTransaction.transfer_amount))), ((senderAccount.available_balance) - ((transferTransaction.transfer_amount))));
-                    } catch (error) {
-                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_SENDER_BALANCE);
-                        return;
-                    }
-                }
-                else {
-                    try {
-                        // update sender account.
-                        await this.getTokenService().setAmounts(
-                            transferTransaction.environment,
-                            transferTransaction.sender_address,
-                            transferTransaction.token_symbol,
-                            ((senderAccount.total_balance) - ((transferTransaction.transfer_amount)) -
-                                (token.transaction_fee)), ((senderAccount.available_balance) - ((transferTransaction.transfer_amount)) -
-                                (token.transaction_fee)));
-                    } catch (error) {
-                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_SENDER_BALANCE);
-                        return;
-                    }
+
+                    items.push({
+                        Update: {
+                            TableName: 'sidewinder_token_account',
+                            Key: {
+                                token_account_id: AccountUtils.calculateTokenAccountId(transferTransaction.environment,
+                                    transferTransaction.token_symbol, transferTransaction.sender_address),
+                            },
+                            UpdateExpression: 'SET available_balance = available_balance - :transfer_amount, total_balance = total_balance - :transfer_amount',
+                            'ExpressionAttributeValues': {
+                                ':transfer_amount' : transferTransaction.transfer_amount
+                            }
+                        }
+                    });
+
+
+                } else {
+
+                    items.push({
+                        Update: {
+                            TableName: 'sidewinder_token_account',
+                            Key: {
+                                token_account_id: AccountUtils.calculateTokenAccountId(transferTransaction.environment,
+                                    transferTransaction.token_symbol, transferTransaction.sender_address),
+                            },
+                            UpdateExpression: 'SET available_balance = available_balance - (:transfer_amount - :transaction_fee), total_balance = total_balance - (:transfer_amount - :transaction_fee)',
+                            'ExpressionAttributeValues': {
+                                ':transfer_amount' : transferTransaction.transfer_amount,
+                                ':transaction_fee' : token.transaction_fee
+                            }
+                        }
+                    });
+
                 }
 
-                if (receiverAccount.account_owner_address === token.token_issuer_address) {
-                    try {
-                        // update receiver account.
-                        await this.getTokenService().setAmounts(
-                            transferTransaction.environment,
-                            transferTransaction.receiver_address, transferTransaction.token_symbol,
-                            (receiverAccount.total_balance) + ((transferTransaction.transfer_amount)+(token.transaction_fee)),
-                            (receiverAccount.available_balance) + ((transferTransaction.transfer_amount)+(token.transaction_fee)));
-                    } catch (error) {
-                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_RECEIVER_BALANCE);
-                        return;
+                if (receiverAccount !== null && receiverAccount.account_owner_address === token.token_issuer_address) {
+
+                    items.push({
+                        Update: {
+                            TableName: 'sidewinder_token_account',
+                            Key: {
+                                token_account_id: AccountUtils.calculateTokenAccountId(transferTransaction.environment,
+                                    transferTransaction.token_symbol, transferTransaction.receiver_address),
+                            },
+                            UpdateExpression: 'SET available_balance = available_balance + :transfer_amount + :transaction_fee, total_balance = total_balance +  + :transfer_amount + :transaction_fee',
+                            'ExpressionAttributeValues': {
+                                ':transfer_amount' : transferTransaction.transfer_amount,
+                                ':transaction_fee' : token.transaction_fee                            }
+                        }
+                    });
+
+                } else {
+
+                    if (receiverAccount === null) {
+                        receiverAccount = {
+                            token_account_id: AccountUtils.calculateTokenAccountId(transferTransaction.environment,
+                                transferTransaction.token_symbol, transferTransaction.receiver_address),
+                            token_symbol: token.token_symbol,
+                            account_owner_address: transferTransaction.receiver_address,
+                            environment: token.environment,
+                            sequence: 0,
+                            available_balance: transferTransaction.transfer_amount,
+                            total_balance: transferTransaction.transfer_amount,
+                            locked_balance: 0,
+                            frozen: false
+                        } as TokenAccount;
+                         items.push({
+                            Put: {
+                                TableName: 'sidewinder_token_account',
+                                Item: receiverAccount,
+                                ConditionExpression: "attribute_not_exists(token_account_id)"
+                            }
+                        });
                     }
-                }
-                else {
-                    try {
-                        // update receiver account.
-                        await this.getTokenService().setAmounts(
-                            transferTransaction.environment,
-                            transferTransaction.receiver_address, transferTransaction.token_symbol,
-                            (receiverAccount.total_balance) + ((transferTransaction.transfer_amount)),
-                            (receiverAccount.available_balance) + ((transferTransaction.transfer_amount)));
-                    } catch (error) {
-                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_RECEIVER_BALANCE);
-                        return;
+                    else {
+                        items.push({
+                            Update: {
+                                TableName: 'sidewinder_token_account',
+                                Key: {
+                                    token_account_id: AccountUtils.calculateTokenAccountId(transferTransaction.environment,
+                                        transferTransaction.token_symbol, transferTransaction.receiver_address),
+                                },
+                                UpdateExpression: 'SET available_balance = available_balance + :transfer_amount, total_balance = total_balance + :transfer_amount',
+                                'ExpressionAttributeValues': {
+                                    ':transfer_amount' : transferTransaction.transfer_amount,
+                                }
+                            }
+                        });
                     }
                 }
 
                 if (senderAccount.account_owner_address !== token.token_issuer_address && receiverAccount.account_owner_address !== token.token_issuer_address) {
-                    try {
-                        // update token account.
-                        await this.getTokenService().setAmounts(
-                            transferTransaction.environment,
-                            token.token_issuer_address, transferTransaction.token_symbol,
-                            (issuerAccount.total_balance) + ((token.transaction_fee)),
-                            (issuerAccount.available_balance) + ((token.transaction_fee)));
-                    } catch (error) {
-                        resolve(CommonErrorCodes.SYSTEM_PROBLEM_SETTING_RECEIVER_BALANCE);
-                        return;
-                    }
+                    items.push({
+                        Update: {
+                            TableName: 'sidewinder_token_account',
+                            Key: {
+                                token_account_id: AccountUtils.calculateTokenAccountId(transferTransaction.environment,
+                                    transferTransaction.token_symbol, token.token_issuer_address),
+                            },
+                            UpdateExpression: 'SET available_balance = available_balance + :transaction_fee, total_balance = total_balance + :transaction_fee',
+                            'ExpressionAttributeValues': {
+                                ':transaction_fee' : token.transaction_fee
+                            }
+                        }
+                    });
                 }
 
                 resolve({status: 200});

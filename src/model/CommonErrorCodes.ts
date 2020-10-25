@@ -64,6 +64,10 @@ export class CommonErrorCodes {
     static readonly TOKEN_SETUP_INITIAL_LESS_THAN_OR_EQUAL_TO_ZERO = {
         status: 400, error_code: 640, error: 'The initial amount is less than or equals to zero.'
     } as ServiceResponse;
+    static readonly TOKEN_SETUP_MALFORMED_INITIAL_AMOUNT = {
+        status: 400, error_code: 650, error: 'The initial amount is malformed.'
+    } as ServiceResponse;
+
 
     // -- token update errors.
     static readonly SYSTEM_PROBLEM_UPDATING_TOKEN_ACCOUNT = {

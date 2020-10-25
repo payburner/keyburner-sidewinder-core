@@ -17,18 +17,20 @@ export class CreateTokenTransactionProcessor extends TransactionProcessorBase im
         super(globalAccountService, tokenService);
     }
 
-    doProcess(decodedTransaction: DecodedTransaction): Promise<ServiceResponse> {
+    doProcess(decodedTransaction: DecodedTransaction, items: Array<any>): Promise<ServiceResponse> {
         const self = this;
 
         return new Promise((resolve, reject) => {
             console.log('Processing create token: ' + decodedTransaction.id);
+
             if (typeof decodedTransaction.payload.initial_amount !== 'undefined' &&
                 typeof decodedTransaction.payload.initial_amount !== 'number') {
                 resolve(CommonErrorCodes.TOKEN_SETUP_MALFORMED_INITIAL_AMOUNT);
                 return;
             }
+
+
             const createTokenTransaction = decodedTransaction.payload as CreateTokenTransaction;
-            console.log('Create Token Request:' + JSON.stringify(createTokenTransaction, null, 2));
             self.getTokenService().getToken(createTokenTransaction.environment, createTokenTransaction.token_symbol)
             .then((token) => {
                 resolve(CommonErrorCodes.TOKEN_ALREADY_EXISTS);
@@ -78,6 +80,8 @@ export class CreateTokenTransactionProcessor extends TransactionProcessorBase im
                 console.log('The token ' + createTokenTransaction.token_symbol + ' does not exist. Creating.');
                 // -- we can create
                 const token = {
+                    token_uri: AccountUtils.calculateTokenId(createTokenTransaction.environment,
+                        createTokenTransaction.token_symbol),
                     token_symbol: createTokenTransaction.token_symbol,
                     environment: createTokenTransaction.environment,
                     token_issuer_address: decodedTransaction.address,
@@ -86,47 +90,53 @@ export class CreateTokenTransactionProcessor extends TransactionProcessorBase im
                     allow_transfers_between_accounts: createTokenTransaction.allow_transfers_between_accounts,
                     is_permissioned: createTokenTransaction.is_permissioned,
                     maximum_balance: this.formatInt(createTokenTransaction.maximum_balance),
-                    minimum_transfer_amount: this.formatInt(createTokenTransaction.minimum_transfer_amount ),
+                    minimum_transfer_amount: this.formatInt(createTokenTransaction.minimum_transfer_amount),
                     maximum_transfer_amount: this.formatInt(createTokenTransaction.maximum_transfer_amount),
                     frozen: createTokenTransaction.frozen,
-                    decimal_precision: (createTokenTransaction.decimal_precision),
+                    decimal_precision: this.formatInt(createTokenTransaction.decimal_precision),
                     underlying_currency: createTokenTransaction.underlying_currency,
                     underlying_account_id: createTokenTransaction.underlying_account_id,
                     underlying_currency_ratio: createTokenTransaction.underlying_currency_ratio
                 } as TokenDefinition;
 
-                self.getTokenService().createToken(token).then(async (createResponse) => {
-
-                    let ownerAccount = {
-                        token_account_id: AccountUtils.calculateTokenAccountId(token.environment,
-                            token.token_symbol, decodedTransaction.address),
-                        token_symbol: token.token_symbol,
-                        account_owner_address: decodedTransaction.address,
-                        environment: token.environment,
-                        sequence: 0,
-                        available_balance: createTokenTransaction.initial_amount,
-                        total_balance: createTokenTransaction.initial_amount,
-                        locked_balance: 0,
-                        frozen: false
-                    } as TokenAccount;
-                    try {
-                        await this.getTokenService().createTokenAccount(ownerAccount);
-                        resolve({status: 200, data: createResponse})
-                    } catch (error) {
-                        resolve({status: 500, error: 'Problem creating receiver account.'});
-                        return;
+                items.push({
+                    Put: {
+                        TableName: 'sidewinder_token',
+                        Item: token,
+                        ConditionExpression: "attribute_not_exists(token_uri)"
                     }
-
-
-                }).catch((error) => {
-                    resolve({status: 500, error});
                 });
-            })
+
+
+                let ownerAccount = {
+                    token_account_id: AccountUtils.calculateTokenAccountId(token.environment,
+                        token.token_symbol, decodedTransaction.address),
+                    token_symbol: token.token_symbol,
+                    account_owner_address: decodedTransaction.address,
+                    environment: token.environment,
+                    sequence: 0,
+                    available_balance: createTokenTransaction.initial_amount,
+                    total_balance: createTokenTransaction.initial_amount,
+                    locked_balance: 0,
+                    frozen: false
+                } as TokenAccount;
+                items.push({
+                    Put: {
+                        TableName: 'sidewinder_token_account',
+                        Item: ownerAccount,
+                        ConditionExpression: "attribute_not_exists(token_account_id)"
+                    }
+                });
+                resolve({status:200})
+            }).catch((error) => {
+                resolve({status: 500, error});
+            });
+
         });
     }
 
-    formatInt( input: number ) : number {
-       return  typeof input !== 'undefined' ? parseInt((input).toFixed(0)) : undefined
+    formatInt(input: number): number {
+        return typeof input !== 'undefined' ? parseInt((input).toFixed(0)) : undefined
     }
 
     getTransactionType(): TransactionTypes {

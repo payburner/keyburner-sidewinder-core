@@ -1,7 +1,7 @@
-import {TokenService} from "../services/TokenService";
+import {TokenService} from "../../TokenService";
 import {AccountUtils, TokenAccount, TokenDefinition} from "@payburner/keyburner-sidewinder-model/dist/npm";
 
-export class TestTokenService implements TokenService {
+export class MemoryTokenService implements TokenService {
 
     tokens = {
 
@@ -85,8 +85,8 @@ export class TestTokenService implements TokenService {
                 reject('Account not found');
             }
             else {
-                self.accounts[AccountUtils.calculateTokenAccountId(environment, token_symbol, address)].available_balance = available_balance.toFixed(0);
-                self.accounts[AccountUtils.calculateTokenAccountId(environment, token_symbol, address)].total_balance = total_balance.toFixed(0);
+                self.accounts[AccountUtils.calculateTokenAccountId(environment, token_symbol, address)].available_balance = available_balance;
+                self.accounts[AccountUtils.calculateTokenAccountId(environment, token_symbol, address)].total_balance = total_balance;
 
                 resolve(true);
             }

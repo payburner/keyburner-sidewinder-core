@@ -61,7 +61,6 @@ export class CoreProcessor {
             }).catch((error) => {
                 resolve(CommonErrorCodes.INVALID_SEQUENCE);
             });
-
         })
     }
 
@@ -89,7 +88,6 @@ export class CoreProcessor {
             } else {
                 resolve(CommonErrorCodes.TRANSACTION_INVALID);
             }
-
         });
     }
 }
